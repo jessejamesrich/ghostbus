@@ -7,3 +7,13 @@ yarn-error.log*
 *.log
 agentmux/snapshots/
 send.log
+
+# Local user config/profile files. Keep examples tracked instead.
+config.toml
+config.local.toml
+profiles/*.toml
+!profiles/*.example.toml
+prompts/*.txt
+!prompts/*.example.txt
+prompts/*.md
+!prompts/*.example.md

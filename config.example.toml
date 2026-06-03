@@ -1,0 +1,27 @@
+# ghostbus example config
+#
+# Copy this to config.toml or ~/.config/ghostbus/config.toml and fill in local paths.
+# Personal config files are intentionally ignored by git.
+
+default_profile = "example"
+state_dir = "~/.local/state/ghostbus"
+
+[profiles.example]
+session = "ghostbus"
+workdir = "."
+layout = "tiled"
+lifecycle = "ephemeral"
+
+[[profiles.example.panes]]
+name = "dev"
+command = "$SHELL"
+
+[[profiles.example.panes]]
+name = "agent"
+command = "codex"
+prompt = "prompts/agent.example.txt"
+
+[[profiles.example.panes]]
+name = "reviewer"
+command = "codex"
+prompt = "prompts/reviewer.example.txt"

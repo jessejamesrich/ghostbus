@@ -3,9 +3,11 @@
 `ghostbus` is a small tmux-backed bus for visible local coding agents.
 
 This repo is the first extraction of the working local prototype. It is intentionally still
-small and a little rigid: the default workspace is a four-pane tmux session with `dev`,
-`orange`, `cicd`, and `bohr` panes. The next step is to replace those defaults with a profile
-config.
+small and a little rigid: the current CLI still creates a four-pane tmux session. The next
+step is to replace those defaults with a profile config.
+
+Local config and role prompts should stay untracked. Use [config.example.toml](./config.example.toml)
+and the `prompts/*.example.txt` files as templates.
 
 ## What Works
 
@@ -20,20 +22,20 @@ config.
 From the repo where you want the panes to open:
 
 ```bash
-GHOSTBUS_WORKDIR="$PWD" ~/Code/jesse/ghostbus/bin/ghostbus start
+GHOSTBUS_WORKDIR="$PWD" /path/to/ghostbus/bin/ghostbus start
 ```
 
 In another shell:
 
 ```bash
-~/Code/jesse/ghostbus/bin/ghostbus status
-~/Code/jesse/ghostbus/bin/ghostbus doctor
+/path/to/ghostbus/bin/ghostbus status
+/path/to/ghostbus/bin/ghostbus doctor
 ```
 
 Run the MCP server directly:
 
 ```bash
-node ~/Code/jesse/ghostbus/src/server.cjs --selftest
+node /path/to/ghostbus/src/server.cjs --selftest
 ```
 
 ## Codex MCP Config
@@ -43,11 +45,10 @@ For this extracted repo, the MCP command is:
 ```toml
 [mcp_servers.ghostbus]
 command = "node"
-args = ["/Users/jesserichard/Code/jesse/ghostbus/src/server.cjs"]
+args = ["/path/to/ghostbus/src/server.cjs"]
 ```
 
-The current live setup may still point at `~/.tooling/ghostbus/src/server.cjs`. Do not switch
-that until you are ready to restart the running agents.
+Restart existing agent processes after changing MCP config.
 
 ## Current Tools
 
@@ -66,16 +67,20 @@ broadcast_agents(session_ids, text, submit?)
 The public version should make the panes configurable:
 
 ```toml
+default_profile = "example"
+
+[profiles.example]
 session = "ghostbus"
 workdir = "."
 
-[[panes]]
+[[profiles.example.panes]]
 name = "dev"
 command = "$SHELL"
 
-[[panes]]
+[[profiles.example.panes]]
 name = "reviewer"
 command = "codex"
+prompt = "prompts/reviewer.example.txt"
 ```
 
-Until then, this repo is a clean place to evolve the prototype away from `~/.tooling`.
+Until then, this repo is a clean place to evolve the prototype.

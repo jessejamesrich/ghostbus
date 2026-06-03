@@ -69,11 +69,8 @@ fi
 
 tmux -f "${CONF}" new-session -d -s "${SESSION}" -n main -c "${WORKDIR}"
 
-# Four-pane starter layout:
-#   dev:    main dev terminal / running output
-#   cicd:   CI/CD and scratch Codex conversations
-#   orange: planner/executor agent
-#   bohr:   auditor agent
+# Four-pane starter layout. This is still hardcoded in the prototype and
+# should move to profile config next.
 tmux split-window -h -t "${SESSION}:0.0" -c "${WORKDIR}"
 tmux split-window -v -t "${SESSION}:0.0" -c "${WORKDIR}"
 tmux split-window -v -t "${SESSION}:0.1" -c "${WORKDIR}"

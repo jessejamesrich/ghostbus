@@ -23,7 +23,7 @@ Usage:
   ghostbus panes [session]          show raw pane ids/titles/commands
   ghostbus lifecycle [session] [ephemeral|persistent]
                                    show or change close-tab behavior
-  ghostbus names [session]          reset pane titles to dev/orange/cicd/bohr
+  ghostbus names [session]          reset pane titles to default role names
   ghostbus read <role|pane> [lines] read recent pane output
   ghostbus send <role|pane> <text>  paste text into pane and submit/queue
   ghostbus send-file <role|pane> <path>
@@ -38,10 +38,10 @@ Examples:
   ghostbus start
   ghostbus start --persistent
   ghostbus status
-  ghostbus read bohr 80
-  ghostbus send cicd 'git status --short'
-  ghostbus send-file bohr prompts/bohr-prompt.txt
-  ghostbus interrupt orange
+  ghostbus read reviewer 80
+  ghostbus send agent 'git status --short'
+  ghostbus send-file reviewer prompts/reviewer.example.txt
+  ghostbus interrupt agent
 
 Env:
   GHOSTBUS_SESSION=ghostbus         override default session
