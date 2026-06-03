@@ -1,0 +1,21 @@
+{
+  "name": "ghostbus",
+  "version": "0.1.0",
+  "private": true,
+  "description": "tmux-backed MCP bus for visible local coding agents",
+  "type": "commonjs",
+  "bin": {
+    "ghostbus": "./bin/ghostbus",
+    "agentmux": "./bin/agentmux",
+    "ghostbus-mcp": "./src/server.cjs"
+  },
+  "scripts": {
+    "doctor": "./bin/ghostbus doctor",
+    "selftest": "node ./src/server.cjs --selftest",
+    "start": "./bin/ghostbus start",
+    "status": "./bin/ghostbus status"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
