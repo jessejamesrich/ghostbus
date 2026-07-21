@@ -10,6 +10,15 @@ fail in plain sight.
 This is a hobby project. It is not a company product, not a platform, and not a supported
 tool. Use it if it is useful. Fork it if you want something different.
 
+## Pairs with EDD
+
+ghostbus is the live wire — it moves messages between agents while they work, and forgets
+everything once the panes close.
+
+[EDD](https://github.com/jessejamesrich/edd) is the other half: a file-based way to record what
+an investigation found, so the next agent session picks up where the last one left off. Bus for
+now, files for memory. They're independent — use either alone — but they compose well.
+
 ## Status
 
 Prototype, extracted from a working personal setup.
