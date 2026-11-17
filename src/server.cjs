@@ -14,8 +14,32 @@ const DEFAULT_SESSION = process.env.GHOSTBUS_TMUX_SESSION || "";
 const SUBMIT_DELAY_MS = Number(process.env.GHOSTBUS_SUBMIT_DELAY_MS || 500);
 const SEND_LOG = process.env.GHOSTBUS_SEND_LOG || path.join(os.homedir(), ".tooling", "ghostbus", "send.log");
 const BUSY_QUEUE_RE = /tab\s+to\s+queue|queue\s+message/i;
-const ROLE_NAMES = ["dev", "cicd", "orange", "bohr"];
-const DEFAULT_PANE_ROLES = ["dev", "orange", "cicd", "bohr"];
+/**
+ * ROLE NAMES COME FROM THE PROFILE. There were two arrays here holding one
+ * person's agent names, and they disagreed on order — one was used to match a
+ * pane title, the other as the positional fallback, so the same pane could
+ * resolve to two different roles depending on which path reached it. One list,
+ * read from config.toml, so the CLI and the MCP server cannot describe
+ * different workspaces.
+ *
+ * A broken config must not take the MCP server down — it is started by a
+ * client that shows no stderr. It falls back to the built-in placeholders and
+ * says so through `list_agents`.
+ */
+const { resolveProfile, builtinProfile } = require("./profile.cjs");
+
+let profileError = "";
+const activeProfile = (() => {
+  try {
+    return resolveProfile();
+  } catch (error) {
+    profileError = error.message;
+    return { ...builtinProfile, source: "built-in (config failed to load)" };
+  }
+})();
+
+const ROLE_NAMES = activeProfile.panes.map((pane) => pane.name);
+const DEFAULT_PANE_ROLES = ROLE_NAMES;
 
 function requestId() {
   return `gb-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
@@ -439,7 +463,7 @@ const TOOLS = [
     inputSchema: {
       type: "object",
       properties: {
-        session_id: { type: "string", description: "Target tmux pane id, such as ghostbus:0.1, or a unique pane title such as bohr." },
+        session_id: { type: "string", description: "Target tmux pane id, such as ghostbus:0.1, or a pane name from the active profile." },
         max_bytes: { type: "number", description: "Maximum bytes to return from the tail. Default 12000." },
         lines: { type: "number", description: "How many scrollback lines to capture before byte trimming. Default 200." },
       },
@@ -452,7 +476,7 @@ const TOOLS = [
     inputSchema: {
       type: "object",
       properties: {
-        session_id: { type: "string", description: "Target tmux pane id, such as ghostbus:0.1, or a unique pane title such as bohr." },
+        session_id: { type: "string", description: "Target tmux pane id, such as ghostbus:0.1, or a pane name from the active profile." },
         text: { type: "string", description: "The prompt or terminal input to paste." },
         submit: { type: "boolean", description: "Submit or queue after pasting. Default true." },
       },
@@ -466,7 +490,7 @@ const TOOLS = [
     inputSchema: {
       type: "object",
       properties: {
-        session_id: { type: "string", description: "Target tmux pane id or unique pane title, such as cicd, orange, or bohr." },
+        session_id: { type: "string", description: "Target tmux pane id, or a pane name from the active profile. Use list_agents to see the names." },
         text: { type: "string", description: "The request to send." },
         request_id: { type: "string", description: "Optional explicit request id. Usually omitted." },
         reply_to: { type: "string", description: "Optional reply target. Usually omitted; ghostbus infers the caller pane inside tmux." },
@@ -486,7 +510,7 @@ const TOOLS = [
         session_ids: {
           type: "array",
           items: { type: "string" },
-          description: "Target pane ids or unique pane titles, such as [\"cicd\", \"bohr\"].",
+          description: "Target pane ids, or pane names from the active profile. Use list_agents to see the names.",
         },
         text: { type: "string", description: "The request to send to each target." },
         request_id: { type: "string", description: "Optional explicit request id. Usually omitted." },
@@ -524,7 +548,7 @@ const TOOLS = [
         session_ids: {
           type: "array",
           items: { type: "string" },
-          description: "Target pane ids or unique pane titles, such as [\"cicd\", \"bohr\"].",
+          description: "Target pane ids, or pane names from the active profile. Use list_agents to see the names.",
         },
         text: { type: "string", description: "The raw message to paste." },
         submit: { type: "boolean", description: "Submit or queue after pasting. Default true." },
@@ -537,8 +561,15 @@ const TOOLS = [
 async function callTool(name, args) {
   if (name === "list_agents") {
     const agents = await listAgents();
-    if (agents.length === 0) return "No tmux panes found.";
-    return agents
+    // THE ONLY CHANNEL THIS SERVER HAS. It is started by an MCP client that
+    // shows no stderr, so a config that failed to load would otherwise be
+    // invisible: the pane names would quietly be the placeholders and every
+    // send by name would miss.
+    const notice = profileError
+      ? `ghostbus: config not loaded (${profileError}); pane names are the built-in placeholders\n`
+      : "";
+    if (agents.length === 0) return `${notice}No tmux panes found.`;
+    return notice + agents
       .map((a) => `${a.session_id}  ${a.active ? "active" : "inactive"}  role=${a.role}  cmd=${a.command}  pid=${a.pid}  dir=${a.working_dir}  title=${a.title}`)
       .join("\n");
   }

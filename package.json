@@ -13,7 +13,9 @@
     "doctor": "./bin/ghostbus doctor",
     "selftest": "node ./src/server.cjs --selftest",
     "start": "./bin/ghostbus start",
-    "status": "./bin/ghostbus status"
+    "status": "./bin/ghostbus status",
+    "test": "node --test test/*.test.cjs && ./test/tmux.test.sh",
+    "profile": "./bin/ghostbus profile"
   },
   "engines": {
     "node": ">=18"

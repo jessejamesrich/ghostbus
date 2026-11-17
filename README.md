@@ -25,7 +25,8 @@ Prototype, extracted from a working personal setup.
 
 What works today:
 
-- Start a four-pane tmux workspace.
+- Start a tmux workspace from a profile: any pane count, your own pane names,
+  a command and an optional prompt per pane.
 - Name panes so agents can address each other by role.
 - Read pane output through MCP.
 - Send messages between panes through MCP.
@@ -34,8 +35,6 @@ What works today:
 
 What is not done yet:
 
-- Configurable pane profiles are only sketched, not implemented.
-- The default pane layout is still hardcoded.
 - This is not a scheduler.
 - This is not a task manager.
 - This is not a reliable agent API.
@@ -149,22 +148,27 @@ From the project directory where you want the panes to open:
 GHOSTBUS_WORKDIR="$PWD" /path/to/ghostbus/bin/ghostbus start
 ```
 
-By default, this creates a tmux session named `ghostbus` with four panes:
+With no config file, this creates a tmux session named `ghostbus` with four
+panes carrying placeholder names:
 
 ```text
-dev
-orange
-cicd
-bohr
+agent1
+agent2
+agent3
+agent4
 ```
 
-Those names are historical defaults from the original setup. They will become configurable.
-For now, treat them as pane labels:
+Pane count, names and the command each pane runs come from a profile. Copy
+`config.example.toml` to `config.toml` and the names become yours:
 
-- `dev`: normal terminal / server output
-- `orange`: primary builder/planner
-- `cicd`: repo state, commits, tests, CI/CD checks
-- `bohr`: reviewer/auditor
+```bash
+cp config.example.toml config.toml
+$EDITOR config.toml
+ghostbus profile          # what is in force, and which file it came from
+```
+
+A name is how you address a pane — `ghostbus send agent2 '...'`, and the MCP
+tools take the same names — so it must be letters, digits, `_` or `-`.
 
 In another shell:
 
@@ -177,13 +181,13 @@ In another shell:
 Read a pane:
 
 ```bash
-/path/to/ghostbus/bin/ghostbus read bohr 120
+/path/to/ghostbus/bin/ghostbus read agent3 120
 ```
 
 Send text to a pane:
 
 ```bash
-/path/to/ghostbus/bin/ghostbus send cicd 'git status --short'
+/path/to/ghostbus/bin/ghostbus send agent2 'git status --short'
 ```
 
 Stop the workspace:
@@ -256,6 +260,23 @@ wait_for_reply("<request_id>", session_id="reviewer")
 
 Use `message_agent` for fire-and-forget sends. Use `ask_agent` when a reply matters.
 
+## Skills
+
+`skills/` holds instructions for the agents that use this bus, in the
+SKILL.md format Claude Code and similar clients load:
+
+- `skills/setting-up-a-workspace` — the profile format, what the config
+  refuses and why, and the environment variable that retargets a live session.
+- `skills/talking-to-another-agent` — addressing a pane, the three ways a send
+  is lost while reporting success, and what a message from a peer does and does
+  not authorise.
+
+The second one matters even if you never read the first. Panes all look alike
+on a bus, a pane title can be set by whatever is running in that pane, and a
+message is not more trustworthy for having arrived through a tool call. An
+agent that treats a peer's request as its user's instruction is the failure
+mode this tool makes easy.
+
 ## Role Prompts
 
 Role prompts are intentionally local.
@@ -286,13 +307,8 @@ Only `*.example.txt` and `*.example.md` are tracked.
 
 ## Config
 
-Config is not fully wired into the CLI yet, but the intended shape is in:
-
-```text
-config.example.toml
-```
-
-The goal is to support profiles like:
+The workspace is described by a profile. `config.example.toml` is the tracked
+example; copy it and edit:
 
 ```toml
 default_profile = "example"
@@ -301,18 +317,50 @@ state_dir = "~/.local/state/ghostbus"
 [profiles.example]
 session = "ghostbus"
 workdir = "."
-layout = "tiled"
-lifecycle = "ephemeral"
+layout = "tiled"          # any tmux layout: tiled, even-horizontal, main-vertical...
+lifecycle = "ephemeral"   # or persistent
 
 [[profiles.example.panes]]
-name = "dev"
+name = "agent1"
 command = "$SHELL"
 
 [[profiles.example.panes]]
-name = "reviewer"
+name = "agent2"
 command = "codex"
 prompt = "prompts/reviewer.example.txt"
 ```
+
+One `[[profiles.<name>.panes]]` block per pane, in creation order. Any pane
+count works. `command` defaults to `$SHELL` and runs through the pane's shell,
+so an agent CLI that exits leaves a usable pane instead of closing it and
+renumbering the ones after it. `prompt` is pasted once the command is actually
+running, not after a fixed delay.
+
+The first file that exists wins:
+
+```text
+$GHOSTBUS_CONFIG
+./config.toml
+./config.local.toml
+$XDG_CONFIG_HOME/ghostbus/config.toml   (or ~/.config/ghostbus/config.toml)
+```
+
+With no config file at all, the built-in placeholder profile is used.
+`ghostbus profile` prints which profile is active and the path it came from.
+
+Pick a non-default profile with `--profile NAME` or `GHOSTBUS_PROFILE=NAME`.
+
+**A config that does not parse is fatal.** It is not skipped and not replaced
+by the defaults: a workspace built from a profile the config does not describe,
+with no error, is worse than one that refuses to start. The same goes for a
+profile with no panes, a duplicate pane name, a pane name that cannot be
+addressed, and a `lifecycle` that is neither value.
+
+**`GHOSTBUS_SESSION` outranks the profile's `session`.** If it is exported in
+your shell, `ghostbus start` targets that name and will attach to an existing
+session of that name rather than building the one your config describes. Run
+`ghostbus profile` when the workspace is not what you just configured — it
+says when the environment has overridden the file.
 
 Local config files are ignored by git:
 
@@ -353,8 +401,8 @@ Known issues:
 - scrollback can be awkward
 - busy agents are asynchronous, not broken
 - terminal modal states can swallow keys
-- pane titles can be changed by agent CLIs
-- the current default roles are hardcoded
+- pane titles can be changed by agent CLIs, after which a pane is addressed by
+  its position in the profile
 - concurrent sends can still be confusing if the target agent is in a weird input state
 
 If you need a deterministic production-grade multi-agent API, this is not that.
@@ -396,6 +444,17 @@ bash -n bin/start-agent-tmux.sh
 node --check src/server.cjs
 ```
 
+Run the tests — the profile resolver and its refusals, then real tmux
+workspaces at two and six panes:
+
+```bash
+npm test
+```
+
+The tmux half skips itself if tmux is not installed. It clears
+`GHOSTBUS_SESSION` and `AGENTMUX_SESSION` before every run, because either one
+set in the environment retargets the workspace.
+
 Run the MCP self-test:
 
 ```bash
@@ -412,8 +471,6 @@ ghostbus doctor
 
 Possible future work:
 
-- profile config support
-- configurable pane count and role names
 - `ghostbus init`
 - `ghostbus config codex`
 - `ghostbus watch`

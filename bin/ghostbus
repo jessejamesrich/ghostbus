@@ -1,14 +1,34 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-SESSION="${GHOSTBUS_SESSION:-${AGENTMUX_SESSION:-ghostbus}}"
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TMUX_CONF="${ROOT}/tmux-agent-bus.conf"
 STARTER="${ROOT}/bin/start-agent-tmux.sh"
 GHOSTBUS="${ROOT}/src/server.cjs"
+PROFILE="${ROOT}/src/profile.cjs"
 SEND_LOG="${GHOSTBUS_SEND_LOG:-${HOME}/.local/state/ghostbus/send.log}"
-ROLES=(dev orange cicd bohr)
 SNAPSHOT_DIR="${GHOSTBUS_SNAPSHOT_DIR:-${HOME}/.local/state/ghostbus/snapshots}"
+
+# THE ROLES COME FROM THE PROFILE, not from a line in this file. This was one
+# person's four agent names compiled into a tool other people run. See
+# config.example.toml, and `ghostbus profile`.
+#
+# A config that does not parse is fatal. Falling back to the built-in profile
+# would start a workspace that is not the one the config describes and say
+# nothing about why.
+load_profile() {
+  local emitted
+  if ! emitted="$(node "$PROFILE" --shell 2>&1)"; then
+    printf '%s\n' "$emitted" >&2
+    exit 1
+  fi
+  eval "$emitted"
+  ROLES=("${GHOSTBUS_PROFILE_ROLES[@]}")
+}
+
+load_profile
+
+SESSION="${GHOSTBUS_SESSION:-${AGENTMUX_SESSION:-${GHOSTBUS_PROFILE_SESSION}}}"
 WORKDIR="${GHOSTBUS_WORKDIR:-${AGENTMUX_WORKDIR:-${PWD}}}"
 
 usage() {
@@ -16,8 +36,8 @@ usage() {
 ghostbus: manage a tmux-backed agent workspace
 
 Usage:
-  ghostbus start [--ephemeral|--persistent] [--dir PATH] [session]
-                                   create/attach the 4-pane workspace
+  ghostbus start [--ephemeral|--persistent] [--dir PATH] [--profile NAME] [session]
+                                   create/attach the workspace from the profile
   ghostbus attach [session]         attach to an existing workspace
   ghostbus status [session]         show agent panes and coarse state
   ghostbus panes [session]          show raw pane ids/titles/commands
@@ -33,6 +53,7 @@ Usage:
   ghostbus snapshot [session]       save recent output for every pane
   ghostbus stop [session]           kill the tmux workspace
   ghostbus doctor [session]         check tmux + ghostbus basics
+  ghostbus profile                  show the active profile and where it came from
 
 Examples:
   ghostbus start
@@ -64,32 +85,6 @@ session_arg() {
   else
     printf '%s' "$SESSION"
   fi
-}
-
-parse_lifecycle_start_args() {
-  local lifecycle="ephemeral"
-  local session="$SESSION"
-  local workdir="$WORKDIR"
-  while [[ $# -gt 0 ]]; do
-    case "$1" in
-      --ephemeral)
-        lifecycle="ephemeral"
-        ;;
-      --persistent)
-        lifecycle="persistent"
-        ;;
-      --dir|--cwd)
-        shift
-        [[ $# -gt 0 ]] || die "--dir requires a path"
-        workdir="$1"
-        ;;
-      *)
-        session="$1"
-        ;;
-    esac
-    shift
-  done
-  printf '%s|%s|%s' "$lifecycle" "$session" "$workdir"
 }
 
 require_tmux() {
@@ -191,14 +186,13 @@ resolve_target() {
   die "no pane matches '$target'"
 }
 
+# FORWARD THE ARGUMENTS, do not rebuild them. This used to parse the flags it
+# knew about and emit a fresh argument list, which silently dropped every other
+# flag: `start --profile work` became a session NAMED work running the default
+# profile. It also always passed an explicit --ephemeral or --persistent, so a
+# profile's own `lifecycle` could never take effect through this path.
 cmd_start() {
-  local parsed lifecycle session workdir rest
-  parsed="$(parse_lifecycle_start_args "$@")"
-  lifecycle="${parsed%%|*}"
-  rest="${parsed#*|}"
-  session="${rest%%|*}"
-  workdir="${rest#*|}"
-  exec "$STARTER" "--${lifecycle}" "--dir" "$workdir" "$session"
+  exec "$STARTER" "$@"
 }
 
 cmd_attach() {
@@ -420,6 +414,29 @@ cmd_doctor() {
   fi
 }
 
+# WHICH WORKSPACE AM I ABOUT TO TOUCH. `start` attaches to an existing session
+# when the resolved name already exists, and GHOSTBUS_SESSION in the
+# environment outranks the profile — so the name on screen is not always the
+# one in the config you just edited. Printing it is the difference between
+# attaching to the wrong workspace and seeing that you did.
+cmd_profile() {
+  printf 'profile:   %s\n' "$GHOSTBUS_PROFILE_NAME"
+  printf 'source:    %s\n' "$GHOSTBUS_PROFILE_SOURCE"
+  printf 'session:   %s' "$SESSION"
+  [[ "$SESSION" != "$GHOSTBUS_PROFILE_SESSION" ]] &&
+    printf ' (profile says %s; overridden by the environment)' "$GHOSTBUS_PROFILE_SESSION"
+  printf '\n'
+  printf 'workdir:   %s\n' "$WORKDIR"
+  printf 'layout:    %s\n' "$GHOSTBUS_PROFILE_LAYOUT"
+  printf 'lifecycle: %s\n' "$GHOSTBUS_PROFILE_LIFECYCLE"
+  printf 'panes:     %s\n' "${#ROLES[@]}"
+  local index
+  for index in "${!ROLES[@]}"; do
+    printf '  %-12s %-12s %s\n' "${ROLES[$index]}" \
+      "${GHOSTBUS_PROFILE_COMMANDS[$index]}" "${GHOSTBUS_PROFILE_PROMPTS[$index]}"
+  done
+}
+
 main() {
   require_tmux
   local cmd="${1:-help}"
@@ -440,6 +457,7 @@ main() {
     snapshot) cmd_snapshot "$@" ;;
     stop|kill) cmd_stop "$@" ;;
     doctor) cmd_doctor "$@" ;;
+    profile|config) cmd_profile "$@" ;;
     *) usage; die "unknown command '$cmd'" ;;
   esac
 }

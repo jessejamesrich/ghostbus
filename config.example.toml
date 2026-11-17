@@ -1,7 +1,12 @@
 # ghostbus example config
 #
-# Copy this to config.toml or ~/.config/ghostbus/config.toml and fill in local paths.
-# Personal config files are intentionally ignored by git.
+# Copy this to config.toml or ~/.config/ghostbus/config.toml and fill in local
+# paths. Personal config files are intentionally ignored by git.
+#
+# This file is what `ghostbus start` reads: pane count, pane names, the command
+# each pane runs and an optional prompt to paste into it. The names you choose
+# are how you address panes — `ghostbus send agent2 '...'` and the MCP tools
+# both take them.
 
 default_profile = "example"
 state_dir = "~/.local/state/ghostbus"
@@ -12,16 +17,24 @@ workdir = "."
 layout = "tiled"
 lifecycle = "ephemeral"
 
+# One [[profiles.<name>.panes]] block per pane, in the order they are created.
+# A name must be letters, digits, _ or -, because it reaches tmux as a pane
+# title and this CLI as an argument. `command` defaults to $SHELL.
+
 [[profiles.example.panes]]
-name = "dev"
+name = "agent1"
 command = "$SHELL"
 
 [[profiles.example.panes]]
-name = "agent"
-command = "codex"
+name = "agent2"
+command = "claude"
 prompt = "prompts/agent.example.txt"
 
 [[profiles.example.panes]]
-name = "reviewer"
+name = "agent3"
 command = "codex"
 prompt = "prompts/reviewer.example.txt"
+
+[[profiles.example.panes]]
+name = "agent4"
+command = "codex"
