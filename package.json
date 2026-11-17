@@ -1,6 +1,7 @@
 {
   "name": "ghostbus",
   "version": "0.1.0",
+  "license": "MIT",
   "private": true,
   "description": "tmux-backed MCP bus for visible local coding agents",
   "type": "commonjs",

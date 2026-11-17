@@ -483,5 +483,4 @@ None of this is promised.
 
 ## License
 
-No license has been selected yet. Until a license is added, treat this repository as source
-available, not open source.
+MIT — see [LICENSE](LICENSE).
