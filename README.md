@@ -1,5 +1,58 @@
 # ghostbus
 
+> ## Deprecated for agent-to-agent messaging
+>
+> **Don't use ghostbus to carry messages between coding agents. Claude Code
+> does this natively now, and does it better.** The tmux workspace is still
+> useful; the message bus is not.
+>
+> **The reason is attribution, not redundancy.** ghostbus splits a multi-line
+> message at newlines, and the last chunk can be left unsubmitted in the
+> receiving pane's input box. When it later submits, it arrives as if the human
+> at the keyboard had typed it, with nothing marking it as a peer's. The tell is
+> a message that starts mid-word. That matters more than garbling, because an
+> agent treats its human's instructions as authority and a peer agent's as
+> something to weigh — and this fault makes the two indistinguishable. A pane
+> bus built on "paste into a terminal and press Enter" has no place to put the
+> provenance. Claude Code's own cross-session messages arrive wrapped in a
+> `<cross-session-message from="...">` envelope stating that they are not from
+> the user and carry none of the user's authority, and that boundary has since
+> been hardened on purpose.
+>
+> **What replaced it, and when.** Claude Code's changelog is version-stamped
+> rather than dated, so these are pinned against the few entries that name a
+> date:
+>
+> | version | entry | dated by |
+> |---|---|---|
+> | 2.1.32 | agent teams research preview, behind `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` | older than 2.1.89 |
+> | 2.1.77 | `SendMessage` auto-resumes stopped agents | older than 2.1.89 |
+> | 2.1.89 | `/buddy` "is here for April 1st" | ≈ 2026-04-01 |
+> | 2.1.197 | Claude Sonnet 5 launch, promo pricing "through August 31" | ≈ 2026-08 |
+> | **2.1.224** | **cross-session `SendMessage`: sessions message each other, on any of your machines, with `ListAgents` to discover them** | after 2.1.197 |
+>
+> The two halves land either side of this repo. In-process agent teams predate
+> ghostbus, whose first commit is 2026-06-02 — but those were teammates inside
+> a single session behind an environment flag, which is not what ghostbus does.
+> The feature that genuinely replaces it is cross-session messaging between
+> independent sessions, at **2.1.224**, roughly three months after this repo was
+> extracted. Note that 2.1.33 is sometimes cited for this; that version fixed
+> in-session tmux teammates and is not cross-session messaging.
+>
+> So ghostbus was not redundant when it was built. It is now.
+>
+> **Migration.** `ask_agent` + `wait_for_reply` becomes `SendMessage` with
+> `notify_when_idle: true`. `message_agent` becomes plain `SendMessage`.
+> `list_agents` becomes `ListAgents`. None of them go through tmux, so every
+> reliability note further down this file stops applying.
+>
+> **What still has no native equivalent.** `read_pane` — reading another
+> session's terminal scrollback — and driving a pane that isn't a Claude
+> session at all. Native messaging only reaches registered sessions and cannot
+> see their screens. The visible-panes idea this repo is actually about, where
+> you watch an agent stall or recover in plain sight, is tmux rather than the
+> bus, and nothing above replaces it. That part still works.
+
 `ghostbus` is a tiny tmux-backed bus for visible local coding agents.
 
 It gives you a terminal workspace where multiple agents can run in separate panes, read each
